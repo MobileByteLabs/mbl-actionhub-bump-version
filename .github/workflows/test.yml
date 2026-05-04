@@ -1,0 +1,16 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify python3
+        run: python3 --version
+      - name: Run bump tests
+        run: bash tests/run-tests.sh

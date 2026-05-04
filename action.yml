@@ -1,0 +1,94 @@
+name: 'Bump Version (post-release)'
+description: 'Open a PR bumping a version key in gradle.properties (or any properties file) after a successful release. Optionally enables auto-merge.'
+author: 'MobileByteLabs'
+branding:
+  icon: 'arrow-up-circle'
+  color: 'green'
+
+inputs:
+  published-version:
+    description: 'The version that was just published (e.g. 3.2.3). Required.'
+    required: true
+  properties-path:
+    description: 'Path to the properties file (relative to repo root).'
+    required: false
+    default: 'gradle.properties'
+  properties-key:
+    description: 'Key holding the version (e.g. kmptoolkit.version). Required.'
+    required: true
+  bump-type:
+    description: 'patch (default) | minor | major'
+    required: false
+    default: 'patch'
+  base-branch:
+    description: 'Branch to target for the bump PR. Defaults to GITHUB_REF_NAME.'
+    required: false
+    default: ''
+  branch-prefix:
+    description: 'Prefix for the bump branch name. Final branch is {prefix}-{next-version}.'
+    required: false
+    default: 'chore/bump-version'
+  pr-title:
+    description: 'Override the PR title. {key}, {next}, {published} are substituted.'
+    required: false
+    default: 'chore(version): bump {key} to {next} (post-release)'
+  auto-merge:
+    description: 'Best-effort enable auto-merge on the PR (--squash). If repo or branch protection disallows, PR stays open.'
+    required: false
+    default: 'true'
+  delete-branch-on-merge:
+    description: 'Pass --delete-branch to gh pr merge.'
+    required: false
+    default: 'true'
+  github-token:
+    description: 'Token for git push + gh pr create. Defaults to github.token. Use a PAT or app token if your branch protection requires bypassing the default GITHUB_TOKEN restriction.'
+    required: false
+    default: ''
+  git-user-name:
+    description: 'Commit author name for the bump commit.'
+    required: false
+    default: 'github-actions[bot]'
+  git-user-email:
+    description: 'Commit author email for the bump commit.'
+    required: false
+    default: '41898282+github-actions[bot]@users.noreply.github.com'
+
+outputs:
+  next-version:
+    description: 'Computed next version'
+    value: ${{ steps.bump.outputs.next }}
+  pr-url:
+    description: 'URL of the opened PR (empty if skipped)'
+    value: ${{ steps.bump.outputs.pr_url }}
+  pr-number:
+    description: 'PR number (empty if skipped)'
+    value: ${{ steps.bump.outputs.pr_number }}
+  branch:
+    description: 'Bump branch name'
+    value: ${{ steps.bump.outputs.branch }}
+  skipped:
+    description: 'true if the bump was skipped (e.g. branch already existed)'
+    value: ${{ steps.bump.outputs.skipped }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Bump version + open PR
+      id: bump
+      shell: bash
+      env:
+        PUBLISHED:    ${{ inputs.published-version }}
+        PROPS_PATH:   ${{ inputs.properties-path }}
+        PROPS_KEY:    ${{ inputs.properties-key }}
+        BUMP_TYPE:    ${{ inputs.bump-type }}
+        BASE_BRANCH:  ${{ inputs.base-branch }}
+        BRANCH_PREFIX: ${{ inputs.branch-prefix }}
+        PR_TITLE_TPL: ${{ inputs.pr-title }}
+        AUTO_MERGE:   ${{ inputs.auto-merge }}
+        DELETE_BRANCH: ${{ inputs.delete-branch-on-merge }}
+        GIT_USER_NAME: ${{ inputs.git-user-name }}
+        GIT_USER_EMAIL: ${{ inputs.git-user-email }}
+        INPUT_TOKEN:  ${{ inputs.github-token }}
+        DEFAULT_TOKEN: ${{ github.token }}
+      run: |
+        bash "${GITHUB_ACTION_PATH}/bump.sh"
