@@ -33,10 +33,17 @@ BASE="${BASE_BRANCH:-$REF_NAME}"
 
 # ── helpers ─────────────────────────────────────────────────────────────────
 
-is_semver() { [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; }
+# Accepts SemVer 2.0.0 (X.Y.Z, optionally followed by -pre.release identifiers
+# and/or +build.metadata) per https://semver.org/spec/v2.0.0.html#backus-naur-form-grammar.
+is_semver() { [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; }
+
+# Strip pre-release + build metadata: 2.0.0-alpha.1+build.5 -> 2.0.0
+strip_prerelease() { echo "${1%%[-+]*}"; }
 
 bump_semver() {
-  local v="$1" kind="$2"
+  local v
+  v="$(strip_prerelease "$1")"
+  local kind="$2"
   local major minor patch
   IFS=. read -r major minor patch <<<"$v"
   case "$kind" in
@@ -50,7 +57,7 @@ bump_semver() {
 
 PUB="${PUBLISHED#v}"
 if ! is_semver "$PUB"; then
-  echo "::error::published-version '${PUBLISHED}' is not valid semver X.Y.Z"
+  echo "::error::published-version '${PUBLISHED}' is not valid SemVer 2.0.0 (X.Y.Z or X.Y.Z-pre.release[+build])"
   exit 1
 fi
 
