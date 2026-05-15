@@ -40,10 +40,63 @@ is_semver() { [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.
 # Strip pre-release + build metadata: 2.0.0-alpha.1+build.5 -> 2.0.0
 strip_prerelease() { echo "${1%%[-+]*}"; }
 
+# Recognised SemVer pre-release suffixes (period-separated counter form):
+# -alpha.N, -beta.N, -rc.N. Other suffixes (-snapshot.1, -pre.1, ...) fall
+# through to the historical strip-and-patch-bump path (documented in README).
+PRERELEASE_REGEX='^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta|rc)\.([0-9]+)$'
+
+# Sets bash globals PRE_BASE, PRE_KIND, PRE_NUM when the input has a recognised
+# pre-release suffix; returns 0. Returns 1 (and leaves globals empty) otherwise.
+parse_prerelease() {
+  PRE_BASE=""; PRE_KIND=""; PRE_NUM=""
+  if [[ "$1" =~ $PRERELEASE_REGEX ]]; then
+    PRE_BASE="${BASH_REMATCH[1]}"
+    PRE_KIND="${BASH_REMATCH[2]}"
+    PRE_NUM="${BASH_REMATCH[3]}"
+    return 0
+  fi
+  return 1
+}
+
 bump_semver() {
-  local v
-  v="$(strip_prerelease "$1")"
+  local input="$1"
   local kind="$2"
+
+  # Pre-release-aware path — detect -alpha.N / -beta.N / -rc.N + branch on kind.
+  # See README "Pre-release-aware bumping" for the full matrix.
+  if parse_prerelease "$input"; then
+    case "$kind" in
+      # Continue the same pre-release line: alpha.N -> alpha.N+1, etc.
+      # Triggered for the default 'patch' bump-type on a pre-release input so
+      # the v2.x alpha/beta/rc cycle continues correctly across publishes.
+      patch)
+        echo "${PRE_BASE}-${PRE_KIND}.$((PRE_NUM + 1))"
+        return
+        ;;
+      # Graduate the pre-release into the GA-shaped version it prefigured:
+      # 2.2.0-rc.5 -> 2.2.0. Cut the final GA publish from the last rc by
+      # setting next-bump-type to this value on the publish workflow.
+      prerelease-graduate)
+        echo "${PRE_BASE}"
+        return
+        ;;
+      # major / minor on a pre-release strip the suffix + bump as if the
+      # current GA-shaped version were PRE_BASE. So 2.2.0-alpha.5 minor
+      # -> 2.3.0 (the alpha line is consumed by the new minor cut).
+      major|minor)
+        ;;
+      *)
+        # Unknown bump-type -> fall through to the historical patch-bump path
+        # below for backwards-compatibility with consumers that pass exotic
+        # kind values.
+        ;;
+    esac
+  fi
+
+  # No recognised pre-release suffix OR major/minor on a pre-release ->
+  # historical "strip + integer bump" path (unchanged from v1.x consumers).
+  local v
+  v="$(strip_prerelease "$input")"
   local major minor patch
   IFS=. read -r major minor patch <<<"$v"
   case "$kind" in

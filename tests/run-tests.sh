@@ -109,6 +109,92 @@ echo "Test 7: PR title placeholders substitute correctly"
   assert_eq "title/sub" "PR title: Bump kmptoolkit.version: 3.2.3 → 3.2.4" "$log"
 }
 
+# ── Test 8: pre-release patch bump — alpha.0 -> alpha.1 (v2.2 bug fix) ──────
+echo "Test 8: pre-release patch 2.2.0-alpha.0 -> 2.2.0-alpha.1"
+{
+  unset PUBLISHED PROPS_KEY BUMP_TYPE
+  export PUBLISHED="2.2.0-alpha.0" PROPS_KEY="kmpflavors.version" BUMP_TYPE="patch"
+  out=$(run_dry)
+  assert_eq "alpha-patch/next"   "next=2.2.0-alpha.1" "$(echo "$out" | grep '^next=')"
+  assert_eq "alpha-patch/branch" "branch=chore/bump-version-2.2.0-alpha.1" "$(echo "$out" | grep '^branch=')"
+}
+
+# ── Test 9: pre-release patch bump — rc.5 -> rc.6 ─────────────────────────────
+echo "Test 9: pre-release patch 2.2.0-rc.5 -> 2.2.0-rc.6"
+{
+  unset PUBLISHED PROPS_KEY BUMP_TYPE
+  export PUBLISHED="2.2.0-rc.5" PROPS_KEY="lib.version" BUMP_TYPE="patch"
+  out=$(run_dry)
+  assert_eq "rc-patch/next" "next=2.2.0-rc.6" "$(echo "$out" | grep '^next=')"
+}
+
+# ── Test 10: prerelease-graduate — rc.5 -> 2.2.0 (drop suffix on GA cut) ─────
+echo "Test 10: prerelease-graduate 2.2.0-rc.5 -> 2.2.0"
+{
+  unset PUBLISHED PROPS_KEY BUMP_TYPE
+  export PUBLISHED="2.2.0-rc.5" PROPS_KEY="lib.version" BUMP_TYPE="prerelease-graduate"
+  out=$(run_dry)
+  assert_eq "graduate/next"   "next=2.2.0" "$(echo "$out" | grep '^next=')"
+  assert_eq "graduate/branch" "branch=chore/bump-version-2.2.0" "$(echo "$out" | grep '^branch=')"
+}
+
+# ── Test 11: pre-release minor bump — alpha.0 minor consumes the alpha line ─
+echo "Test 11: pre-release minor 2.2.0-alpha.0 -> 2.3.0 (alpha line consumed)"
+{
+  unset PUBLISHED PROPS_KEY BUMP_TYPE
+  export PUBLISHED="2.2.0-alpha.0" PROPS_KEY="lib.version" BUMP_TYPE="minor"
+  out=$(run_dry)
+  assert_eq "pre-minor/next" "next=2.3.0" "$(echo "$out" | grep '^next=')"
+}
+
+# ── Test 12: pre-release major bump — alpha.0 major -> 3.0.0 ────────────────
+echo "Test 12: pre-release major 2.2.0-alpha.0 -> 3.0.0"
+{
+  unset PUBLISHED PROPS_KEY BUMP_TYPE
+  export PUBLISHED="2.2.0-alpha.0" PROPS_KEY="lib.version" BUMP_TYPE="major"
+  out=$(run_dry)
+  assert_eq "pre-major/next" "next=3.0.0" "$(echo "$out" | grep '^next=')"
+}
+
+# ── Test 13: GA-shaped patch unchanged — historical behaviour preserved ─────
+echo "Test 13: GA patch 2.2.0 -> 2.2.1 (historical behaviour preserved)"
+{
+  unset PUBLISHED PROPS_KEY BUMP_TYPE
+  export PUBLISHED="2.2.0" PROPS_KEY="lib.version" BUMP_TYPE="patch"
+  out=$(run_dry)
+  assert_eq "ga-patch/next" "next=2.2.1" "$(echo "$out" | grep '^next=')"
+}
+
+# ── Test 14: unrecognised pre-release suffix falls back to strip+patch ──────
+echo "Test 14: unrecognised suffix 2.2.0-snapshot.1 -> 2.2.1 (fallback)"
+{
+  unset PUBLISHED PROPS_KEY BUMP_TYPE
+  export PUBLISHED="2.2.0-snapshot.1" PROPS_KEY="lib.version" BUMP_TYPE="patch"
+  out=$(run_dry)
+  assert_eq "snapshot-fallback/next" "next=2.2.1" "$(echo "$out" | grep '^next=')"
+}
+
+# ── Test 15: prerelease-graduate on GA-shaped version is a no-op fallback ───
+echo "Test 15: graduate on non-pre-release 2.2.0 -> 2.2.1 (fallback)"
+{
+  unset PUBLISHED PROPS_KEY BUMP_TYPE
+  export PUBLISHED="2.2.0" PROPS_KEY="lib.version" BUMP_TYPE="prerelease-graduate"
+  out=$(run_dry)
+  # graduate is meaningless without a pre-release suffix; fall through to
+  # patch path (the prerelease-graduate kind is unknown to the legacy case,
+  # so it lands on the patch|* default and bumps the patch component).
+  assert_eq "graduate-fallback/next" "next=2.2.1" "$(echo "$out" | grep '^next=')"
+}
+
+# ── Test 16: beta line — pre-release patch beta.2 -> beta.3 ─────────────────
+echo "Test 16: pre-release patch 2.2.0-beta.2 -> 2.2.0-beta.3"
+{
+  unset PUBLISHED PROPS_KEY BUMP_TYPE
+  export PUBLISHED="2.2.0-beta.2" PROPS_KEY="lib.version" BUMP_TYPE="patch"
+  out=$(run_dry)
+  assert_eq "beta-patch/next" "next=2.2.0-beta.3" "$(echo "$out" | grep '^next=')"
+}
+
 # ── summary ──────────────────────────────────────────────────────────────────
 echo ""
 echo "──────────────────────────────────────────────"
