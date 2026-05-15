@@ -17,7 +17,19 @@ inputs:
     description: 'Key holding the version (e.g. kmptoolkit.version). Required.'
     required: true
   bump-type:
-    description: 'patch (default) | minor | major'
+    description: |
+      patch (default) | minor | major | prerelease-graduate.
+
+      Pre-release-aware behavior on -alpha.N / -beta.N / -rc.N suffixes:
+        patch                 → continue the same pre-release line
+                                (2.2.0-alpha.0 → 2.2.0-alpha.1).
+        prerelease-graduate   → drop the suffix; cut the GA from the last rc
+                                (2.2.0-rc.5 → 2.2.0).
+        major | minor         → strip suffix + bump as normal
+                                (2.2.0-alpha.0 minor → 2.3.0).
+
+      No pre-release suffix (or unrecognised suffix like -snapshot.1):
+        historical strip-and-integer-bump behaviour. Unchanged from v1.x.
     required: false
     default: 'patch'
   base-branch:

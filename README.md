@@ -37,7 +37,7 @@ After publishing v3.2.3, this opens a PR setting `kmptoolkit.version=3.2.4` in `
 | `published-version` | **Yes** | — | Version that was just published (e.g. `3.2.3`) |
 | `properties-key` | **Yes** | — | Key to update (e.g. `kmptoolkit.version`) |
 | `properties-path` | No | `gradle.properties` | Path to file |
-| `bump-type` | No | `patch` | `patch` / `minor` / `major` |
+| `bump-type` | No | `patch` | `patch` / `minor` / `major` / `prerelease-graduate` — see [Pre-release-aware bumping](#pre-release-aware-bumping) |
 | `base-branch` | No | `${{ github.ref_name }}` | Target branch for the PR |
 | `branch-prefix` | No | `chore/bump-version` | Branch name prefix |
 | `pr-title` | No | `chore(version): bump {key} to {next} (post-release)` | Title; supports `{key}`, `{next}`, `{published}` |
@@ -66,6 +66,42 @@ If your `base-branch` requires PR review approvals or status checks **and** uses
     published-version: ${{ needs.publish.outputs.version }}
     properties-key: 'kmptoolkit.version'
     github-token: ${{ secrets.RELEASE_BOT_TOKEN }}    # PAT with repo + workflow scopes
+```
+
+## Pre-release-aware bumping
+
+As of `v1.6.0` the bumper recognises SemVer 2.0.0 pre-release suffixes `-alpha.N`, `-beta.N`, `-rc.N` (period-separated counter form) and bumps them intelligently instead of stripping them.
+
+| `published-version` | `bump-type` | `next-version` | When to use |
+|---|---|---|---|
+| `2.2.0-alpha.0` | `patch` (default) | `2.2.0-alpha.1` | Continue the alpha cycle |
+| `2.2.0-beta.2` | `patch` | `2.2.0-beta.3` | Continue the beta cycle |
+| `2.2.0-rc.5` | `patch` | `2.2.0-rc.6` | Continue the rc cycle |
+| `2.2.0-rc.5` | `prerelease-graduate` | `2.2.0` | Cut the GA from the last rc — drop the suffix |
+| `2.2.0-alpha.0` | `minor` | `2.3.0` | Consume the alpha line + bump minor |
+| `2.2.0-alpha.0` | `major` | `3.0.0` | Consume the alpha line + bump major |
+| `2.2.0` | `patch` | `2.2.1` | GA patch — historical behaviour |
+| `2.2.0-snapshot.1` | `patch` | `2.2.1` | Unrecognised suffix falls through to strip+patch |
+
+Suffix detection is strict: only `-alpha.N`, `-beta.N`, `-rc.N` (lowercase, period-separated integer counter) trigger the pre-release-aware path. Custom suffixes (`-pre.1`, `-snapshot.1`, `-build.7`) fall through to the historical strip-and-patch-bump path for backwards-compatibility.
+
+For multi-stage publish workflows the typical orchestration is:
+
+```yaml
+# Default — continue the same pre-release line on every alpha publish.
+- uses: MobileByteLabs/mbl-actionhub-bump-version@v1.6.0
+  with:
+    published-version: ${{ needs.publish.outputs.version }}
+    properties-key: 'kmpflavors.version'
+    bump-type: 'patch'
+
+# When cutting the GA from the last rc, override to prerelease-graduate.
+- uses: MobileByteLabs/mbl-actionhub-bump-version@v1.6.0
+  if: contains(needs.publish.outputs.version, '-rc.')
+  with:
+    published-version: ${{ needs.publish.outputs.version }}
+    properties-key: 'kmpflavors.version'
+    bump-type: 'prerelease-graduate'
 ```
 
 ## Behavior on re-runs
